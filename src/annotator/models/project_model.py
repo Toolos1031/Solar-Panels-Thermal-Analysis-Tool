@@ -2,6 +2,7 @@ import os
 import json
 import numpy as np
 import cv2
+import math
 from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtGui import QPixmap, QImage
 from PyQt6.QtCore import Qt
@@ -246,4 +247,120 @@ class ProjectModel(QObject):
     def get_annotations(self, photo_id: str) -> list:
         # Retrives the list of annotations for a specific photo
         return self.project_data.get("annotations", {}).get(photo_id, [])
+
+    def get_spatial_neighbors(self, current_photo_id: str, coverage_multiplier: float = 0.75) -> list:
+        # Finds spatial neighbors based on search radius that is coupled to coverage multiplier and height
+
+        # 1 Get current photo data
+        current_data = self.project_data.get("images", {}).get(current_photo_id, {})
+        if not current_data or "rtk_data" not in current_data:
+            return []
+
+        cur_rtk = current_data["rtk_data"]
+        cur_lat = cur_rtk.get("GPSLatitude", 0)
+        cur_lon = cur_rtk.get("GPSLongitude", 0)
+        cur_alt = cur_rtk.get("RelativeAltitude", 0)
+
+        if cur_lat is None or cur_lon is None or cur_alt is None or math.isnan(cur_alt):
+            return []
+
+        # Dorky dynamic radius
+        dynamic_search_radius = cur_alt * coverage_multiplier
+
+        neighbors = []
+
+        LAT_TO_METERS = 111320.0
+        LON_TO_METERS = 111320.0 * math.cos(math.radians(cur_lat))
+
+        for photo_id, data in self.project_data.get("images", {}).items():
+            if photo_id == current_photo_id:
+                continue
+
+            n_rtk = data.get("rtk_data", {})
+            n_lat = n_rtk.get("GPSLatitude", 0)
+            n_lon = n_rtk.get("GPSLongitude", 0)
+
+            if n_lat is None or n_lon is None:
+                continue
+
+            # Calculate delta in meters (approximate)
+            delta_y = (n_lat - cur_lat) * LAT_TO_METERS
+            delta_x = (n_lon - cur_lon) * LON_TO_METERS
+            distance = math.sqrt(delta_x**2 + delta_y**2)
+
+            if distance <= dynamic_search_radius:
+                neighbors.append(photo_id)
+
+        return neighbors
+
         
+    def get_projected_neighbor_labels(self, current_photo_id: str, image_width: int, image_height: int) -> list:
+        # Finds labels from previous and next photos
+        # roughly projects them onto the current photo
+
+        projected_labels = []
+
+        # 1 Get current photo data
+        current_data = self.project_data.get("images", {}).get(current_photo_id, {})
+        if not current_data or "rtk_data" not in current_data:
+            return []
+
+        cur_rtk = current_data["rtk_data"]
+        cur_lat = cur_rtk.get("GPSLatitude", 0)
+        cur_lon = cur_rtk.get("GPSLongitude", 0)
+        cur_yaw = cur_rtk.get("FlightYawDegree", 0)
+
+
+        # Some dorky constants to translate label positions
+        PPM_X = 32.0
+        PPM_Y = 29.0
+
+        # Grab the neighbors
+        spatial_neighbors = self.get_spatial_neighbors(current_photo_id, coverage_multiplier=1.5)
+
+        for neighbor_id in filter(None, spatial_neighbors):
+            neighbor_labels = self.get_annotations(neighbor_id)
+            if not neighbor_labels:
+                continue
+
+            neighbor_rtk = self.project_data["images"][neighbor_id].get("rtk_data", {})
+            n_lat = neighbor_rtk.get("GPSLatitude", 0)
+            n_lon = neighbor_rtk.get("GPSLongitude", 0)
+
+            # Calculate delta in meters (approximate)
+
+            LAT_TO_METERS = 111320.0
+            LON_TO_METERS = 111320.0 * math.cos(math.radians(cur_lat))
+
+            delta_y_meters = (n_lat - cur_lat) * LAT_TO_METERS
+            delta_x_meters = (n_lon - cur_lon) * LON_TO_METERS
+
+            # Rotate the delta based on current yaw
+            yaw_rad = math.radians(cur_yaw)
+            rot_x = delta_x_meters * math.cos(yaw_rad) - delta_y_meters * math.sin(yaw_rad)
+            rot_y = delta_x_meters * math.sin(yaw_rad) + delta_y_meters * math.cos(yaw_rad)
+
+            # Convert to pixel shift
+            pixel_shift_x = rot_x * PPM_X
+            pixel_shift_y = -rot_y * PPM_Y
+
+            # Apply shift to all labels from neighbors
+            for label in neighbor_labels:
+                new_x = label["x"] + pixel_shift_x
+                new_y = label["y"] + pixel_shift_y
+                w = label["w"]
+                h = label["h"]
+
+                if (new_x + w < 0) or (new_x > image_width) or (new_y + h < 0) or (new_y > image_height):
+                    continue
+
+                projected_labels.append({
+                    "fault_type": label["fault_type"] + " (Neighbor)",
+                    "x": new_x,
+                    "y": new_y,
+                    "w": w,
+                    "h": h,
+                    "is_neighbor": True
+                })
+
+        return projected_labels

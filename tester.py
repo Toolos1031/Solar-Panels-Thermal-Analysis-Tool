@@ -1,24 +1,19 @@
-import pandas as pd
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QGraphicsView, QGraphicsScene, QHBoxLayout, QMainWindow, QApplication, QGraphicsEllipseItem, QStatusBar
-from PyQt6.QtGui import QPixmap, QPen, QBrush, QColor
-from PyQt6.QtCore import Qt
-import sys
 import json
-from widgets.annotation_toolbar import AnnotationToolbar
+
+data = r"D:\orlen_fotowoltaika\project_data.json"
 
 
-class Tester(QMainWindow):
-    def __init__(self):
-        super().__init__()
 
-        toolbar = AnnotationToolbar()
-        self.addToolBar(toolbar)
-
-        self.setStatusBar(QStatusBar(self))
+with open(data, "r") as file:
+    json_data = json.load(file)
 
 
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = Tester()
-    window.show()
-    sys.exit(app.exec())
+image_name = "DJI_20240829131300_0002_T.tif"
+
+neighbors = ["DJI_20240829131259_0001_T.tif", "DJI_20240829131301_0003_T.tif"]
+
+for neighbor_id in filter(None, neighbors):
+
+    image = json_data["images"][neighbor_id].get("thermal_path")
+
+    print(image)

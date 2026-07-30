@@ -86,6 +86,42 @@ class PhotoView(QWidget):
         self.del_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Delete), self)
         self.del_shortcut.activated.connect(self._delete_selected_items)
 
+        # Bind right arrow to next photo
+        self.next_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Right), self)
+        self.next_shortcut.activated.connect(self._on_next_clicked)
+
+        # Bind left arrow to previous photo
+        self.prev_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Left), self)
+        self.prev_shortcut.activated.connect(self._on_prev_clicked)
+
+        # Bind C to clear temporary measurements
+        self.clear_temp_shortcut = QShortcut(QKeySequence(Qt.Key.Key_C), self)
+        self.clear_temp_shortcut.activated.connect(self._clear_temperature_markers)
+
+        # Bind S to toggle spot temperature tool
+        self.spot_temp_shortcut = QShortcut(QKeySequence(Qt.Key.Key_S), self)
+        self.spot_temp_shortcut.activated.connect(self.toolbar.spot_temp_action.trigger)
+
+        # Bind B to toggle box temperature tool
+        self.box_temp_shortcut = QShortcut(QKeySequence(Qt.Key.Key_B), self)
+        self.box_temp_shortcut.activated.connect(self.toolbar.box_temp_action.trigger)
+
+        # Bind L to toggle label tool
+        self.label_shortcut = QShortcut(QKeySequence(Qt.Key.Key_L), self)
+        self.label_shortcut.activated.connect(self.toolbar.label_action.trigger)
+
+        # Bind D to delete selected items
+        self.delete_shortcut = QShortcut(QKeySequence(Qt.Key.Key_D), self)
+        self.delete_shortcut.activated.connect(self._delete_selected_items)
+
+        # Bind ESC to go back to the map view
+        self.back_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Escape), self)
+        self.back_shortcut.activated.connect(self._on_back_clicked)
+
+        # Bind T to toggle CLAHE
+        self.clahe_shortcut = QShortcut(QKeySequence(Qt.Key.Key_T), self)
+        self.clahe_shortcut.activated.connect(self.toggle_CLAHE)
+
     def _link_views(self): # Link the RGB and thermal views for synchronized panning and zooming
 
         # 1. Sync panning
@@ -112,6 +148,9 @@ class PhotoView(QWidget):
         pixmap = self.project_model.create_thermal_pixmap(self.current_thermal_data)
         self.thermal_scene.clear()
         self.thermal_scene.addPixmap(pixmap)
+
+        # Lock the canvas size
+        self.thermal_scene.setSceneRect(0, 0, pixmap.width(), pixmap.height())
 
         # Reset zoom and pan and fit into view
         self.thermal_view.resetTransform()
@@ -282,8 +321,35 @@ class PhotoView(QWidget):
     def _load_existing_annotations(self, photo_id: str):
         # fetches existing annotations for the current photo and displays them on the thermal view
 
+        # Load actual annotations for this photo
         annotations = self.project_model.get_annotations(photo_id)
 
         for ann in annotations:
             label_item = EditableRectItem(ann["x"], ann["y"], ann["w"], ann["h"], ann["fault_type"])
             self.thermal_scene.addItem(label_item)
+
+        # Load projected neigbor annotations
+        pixmap_size = self.thermal_scene.sceneRect().size()
+        image_width = pixmap_size.width()
+        image_height = pixmap_size.height()
+
+        neighbor_annotations = self.project_model.get_projected_neighbor_labels(photo_id, image_width, image_height)
+
+        for ann in neighbor_annotations:
+
+            # QGraphicsRectItem so user cannot interract with it
+            rect = QGraphicsRectItem(ann["x"], ann["y"], ann["w"], ann["h"])
+
+            # Style it differentyl
+            rect.setPen(QPen(QColor(255, 255, 0, 150), 2, Qt.PenStyle.DashLine))
+            rect.setBrush(QBrush(QColor(255, 255, 0, 30)))
+            self.thermal_scene.addItem(rect)
+            
+            # Add small text
+            text = QGraphicsTextItem(ann["fault_type"])
+            text.setDefaultTextColor(QColor(255, 255, 0, 150))
+            text.setPos(ann["x"], ann["y"] - 25)
+            self.thermal_scene.addItem(text)
+
+    def toggle_CLAHE(self):
+        ...
