@@ -1,7 +1,7 @@
 import os
 import logging
 from PyQt6.QtCore import QObject, pyqtSignal
-from models.model import ConversionWorker, ExifWorker, JsonWorker
+from models.model import ConversionWorker, ExifWorker, JsonWorker, SegmentationWorker
 
 class LogEmitter(QObject):
     log_signal = pyqtSignal(str)
@@ -35,6 +35,7 @@ class DJIThermalConverterController:
         self.view.start_btn.clicked.connect(self.start_conversion)
         self.view.exif_btn.clicked.connect(self.extract_exif_data)
         self.view.generate_json_btn.clicked.connect(self.generate_project_json)
+        self.view.segmentation_btn.clicked.connect(self.run_segmentation)
 
     def setup_logging(self):
         logger = logging.getLogger()
@@ -118,4 +119,19 @@ class DJIThermalConverterController:
         self.worker.progress.connect(self.view.progress_bar.setValue)
         self.worker.finished.connect(lambda: self.on_task_finished("JSON Generation completed."))
         self.worker.error.connect(self.on_task_error)
+        self.worker.start()
+
+    def run_segmentation(self):
+        if not os.path.isdir(self.view.output_dir_edit.text()):
+            self.view.show_message("Warning", "Invalid output directory.", is_error=True)
+            return
+
+        self.view.set_gui_state(False)
+
+        self.worker = SegmentationWorker(self.view.input_dir_edit.text(), project_data_path = self.view.project_data_edit.text(), model_path = "best.pt")
+
+        self.worker.progress.connect(self.view.progress_bar.setValue)
+        self.worker.finished.connect(lambda: self.on_task_finished("Segmentation completed."))
+        self.worker.error.connect(self.on_task_error)
+
         self.worker.start()

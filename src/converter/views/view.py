@@ -97,12 +97,14 @@ class DJIThermalConverterView(QMainWindow):
         self.start_btn = QPushButton("Start Batch Conversion")
         self.exif_btn = QPushButton("Extract EXIF Data")
         self.generate_json_btn = QPushButton("Generate Project JSON")
+        self.segmentation_btn = QPushButton("Run Segmentation")
         self.progress_bar = QProgressBar()
         self.progress_bar.setValue(0)
 
         action_layout.addWidget(self.start_btn)
         action_layout.addWidget(self.exif_btn)
         action_layout.addWidget(self.generate_json_btn)
+        action_layout.addWidget(self.segmentation_btn)
         action_layout.addWidget(self.progress_bar)
         main_layout.addLayout(action_layout)
 
@@ -125,6 +127,7 @@ class DJIThermalConverterView(QMainWindow):
         self.start_btn.setEnabled(state)
         self.exif_btn.setEnabled(state)
         self.generate_json_btn.setEnabled(state)
+        self.segmentation_btn.setEnabled(state)
         if not state:
             self.progress_bar.setValue(0)
             self.log_console.clear()

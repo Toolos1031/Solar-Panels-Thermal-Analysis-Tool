@@ -1,12 +1,14 @@
 import os
 import subprocess
 import logging
+from matplotlib.pyplot import box
 import numpy as np
 import tifffile
 from datetime import datetime, timezone
 import pandas as pd
 import json
 import re
+from ultralytics import YOLO
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
@@ -58,6 +60,7 @@ class ConversionWorker(QThread):
 
     def process_single_image(self, filename):
         filepath = os.path.join(self.input_dir, filename).replace('\\', '/')
+        print(filepath)
         out_filepath = os.path.join(self.output_dir, filename.replace('.JPG', '.tif')).replace('.jpg', '.tif').replace('\\', '/')
         temp_raw = os.path.join(self.output_dir, f"{filename}_temp.raw").replace('\\', '/')
 
@@ -194,3 +197,83 @@ class JsonWorker(QThread):
         degrees, minutes, seconds = float(match.group(1)), float(match.group(2)), float(match.group(3))
         decimal_degrees = degrees + (minutes / 60.0) + (seconds / 3600.0)
         return -decimal_degrees if match.group(4) in ['S', 'W'] else decimal_degrees
+
+class SegmentationWorker(QThread):
+    progress = pyqtSignal(int)
+    finished = pyqtSignal()
+    error = pyqtSignal(str)
+
+    def __init__(self, input_dir, project_data_path, model_path = "best.pt"):
+        super().__init__()
+        self.input_dir = input_dir
+        self.project_data_path = project_data_path
+        self.model_path = model_path
+
+    def run(self):
+        try:
+            logging.info(f"Loading YOLO model from {self.model_path}...")
+            model = YOLO(self.model_path)
+
+            if not os.path.isfile(self.project_data_path):
+                raise FileNotFoundError("project_data.json not found. Run JSON generation first.")
+
+            with open(self.project_data_path, 'r', encoding='utf-8') as f:
+                project_data = json.load(f)
+
+            if "segmentation" not in project_data:
+                project_data["segmentation"] = {}
+
+            # All files that end with JPG and have _V in their name (case insensitive)
+            filenames = [f for f in os.listdir(self.input_dir) if f.upper().endswith('.JPG') and '_V' in f.upper()]
+            total_files = len(filenames)
+
+            if total_files == 0:
+                logging.warning("No visible images (*_V.JPG) found in the input directory.")
+                self.finished.emit()
+                return
+
+            logging.info(f"Found {total_files} visible files. Starting segmentation...")
+
+            for i, filename in enumerate(filenames):
+                filepath = os.path.join(self.input_dir, filename)
+
+                tif_filename = filename.replace('.JPG', '.tif').replace('.jpg', '.tif')
+
+                project_data["segmentation"][tif_filename] = []
+
+                results = model.predict(source = filepath, conf = 0.5, verbose = False, save = False)
+
+                for result in results:
+                    if result.masks is not None:
+                        for idx, polygon in enumerate(result.masks.xy):
+                            cls_id = int(result.boxes.cls[idx].item())
+                            class_name = result.names[cls_id]
+
+                            x1, y1, x2, y2 = result.boxes.xyxy[idx].tolist()
+                            w = x2 - x1
+                            h = y2 - y1
+
+                            poly_points = polygon.tolist()
+
+                            segmentation_item = {
+                                "detection_class": class_name,
+                                "points": poly_points,
+                                "x": x1,
+                                "y": y1,
+                                "w": w,
+                                "h": h
+                            }
+
+                            project_data["segmentation"][tif_filename].append(segmentation_item)
+
+                self.progress.emit(int(((i + 1) / total_files) * 100))
+
+            with open(self.project_data_path, 'w', encoding='utf-8') as f:
+                json.dump(project_data, f, indent=4)
+
+            logging.info("Segmentation finished!")
+            self.finished.emit()
+
+        except Exception as e:
+            logging.error(f"Error during segmentation: {e}")
+            self.error.emit(str(e))
