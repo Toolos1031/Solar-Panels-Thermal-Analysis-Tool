@@ -13,7 +13,7 @@ This repository contains a two-part software suite built with PyQt6:
 ### 1. DJI Thermal Converter (Preprocessing Pipeline)
 * **Batch Radiometric Conversion:** Uses the DJI Thermal SDK (`dji_irp.exe`) to convert standard `_T.JPG` images into 32-bit float radiometric `.tif` arrays, allowing for precise environmental overrides (Emissivity, Distance, Humidity, Reflection).
 * **RTK & Metadata Extraction:** Leverages `exiftool` to build a database of drone coordinates (Latitude, Longitude, Relative Altitude, Gimbal Pitch, Flight Yaw).
-* **AI Segmentation & Pre-flagging:** Runs a YOLOv8 model (`best.pt`) on RGB images to segment solar panels, maps them to the thermal array, calculates $\Delta T$ (Max-Min temperature), and automatically flags panels exceeding a 10°C threshold.
+* **AI Segmentation & Pre-flagging:** Runs a YOLOv26 model (`best.pt`) on RGB images to segment solar panels, maps them to the thermal array, calculates $\Delta T$ (Max-Min temperature), and automatically flags panels exceeding a 10°C threshold.
 * **JSON Generation:** Compiles all spatial, thermal, and segmentation data into a single `project_data.json` file.
 
 ### 2. Thermal PV Annotator (Inspection GUI)
