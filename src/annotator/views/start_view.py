@@ -47,7 +47,7 @@ class StartView(QWidget):
 
         # Image directory picker
         self.img_dir_input = QLineEdit()
-        self.img_dir_input.setText(os.abspath("/thermal_tiff_images"))
+        self.img_dir_input.setText(os.path.abspath("/thermal_images"))
         self.img_dir_btn = QPushButton("Browse...")
         self.img_dir_btn.clicked.connect(self._select_img_dir)
         form_layout.addRow("Thermal Image Directory:", self._create_input_row(self.img_dir_input, self.img_dir_btn))
