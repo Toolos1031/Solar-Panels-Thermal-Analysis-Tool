@@ -8,7 +8,7 @@ This repository contains a two-part software suite built with PyQt6:
 
 ---
 
-## ✨ Suite Features
+## Suite Features
 
 ### 1. DJI Thermal Converter (Preprocessing Pipeline)
 * **Batch Radiometric Conversion:** Uses the DJI Thermal SDK (`dji_irp.exe`) to convert standard `_T.JPG` images into 32-bit float radiometric `.tif` arrays, allowing for precise environmental overrides (Emissivity, Distance, Humidity, Reflection).
@@ -27,7 +27,7 @@ This repository contains a two-part software suite built with PyQt6:
 
 ---
 
-## 🚀 Installation & Prerequisites
+## Installation & Prerequisites
 
 ### 1. Python Dependencies
 Ensure you have Python 3.9+ installed. Install the required packages:
@@ -45,7 +45,7 @@ To run the **Converter**, you must download two external command-line tools:
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```text
 Thermal_tool/
@@ -70,7 +70,7 @@ Thermal_tool/
 
 ---
 
-## 🖥️ Usage Guide
+## Usage Guide
 
 ### Phase 1: Preprocessing
 
@@ -98,7 +98,7 @@ python src/annotator/main.py
 2. Click **Load Project** to view the interactive map.
 3. Click any marker on the map to begin inspecting the thermal signatures.
 
-### ⌨️ Annotator Keyboard Shortcuts
+###  Annotator Keyboard Shortcuts
 
 | Key | Action |
 | --- | --- |
@@ -113,9 +113,3 @@ python src/annotator/main.py
 | `Esc` | Return to Map View |
 
 ---
-
-*Built for advanced photogrammetry and PV thermography workflows.*
-
-```
-
-```
