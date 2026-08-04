@@ -32,7 +32,7 @@ class MapView(QWidget):
 
         map_label = QLabel("Map View")
         map_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        map_label.setStyleSheet("font-size: 24px; font-weight: bold;")
+        #map_label.setStyleSheet("font-size: 24px; font-weight: bold;")
         main_layout.addWidget(map_label)
 
         self.view = QGraphicsView()
@@ -56,6 +56,21 @@ class MapView(QWidget):
 
         main_layout.addLayout(btn_layout)
 
+    def resizeEvent(self, event):
+        # Automatically scale the map to fit the window when resized
+        super().resizeEvent(event)
+
+        if self.scene.sceneRect().isValid() and not self.scene.sceneRect().isEmpty():
+            self.view.fitInView(self.scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
+
+    def showEvent(self, event):
+        """Ensures the map is scaled correctly the moment this view becomes visible."""
+        super().showEvent(event)
+        
+        # Fit the image to the newly visible viewport
+        if self.scene.sceneRect().isValid() and not self.scene.sceneRect().isEmpty():
+            self.view.fitInView(self.scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
+
     def _on_back_clicked(self): # Emit the clicked_back signal to navigate back to the StartView
         self.clicked_back.emit()
 
@@ -66,6 +81,7 @@ class MapView(QWidget):
             pixmap = QPixmap(ortho_file_path)
             self.pixmap_size = pixmap.size()
             self.scene.clear()
+            self.photo_markers.clear()
             self.scene.addPixmap(pixmap)
             self.view.fitInView(self.scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
 
@@ -103,8 +119,12 @@ class MapView(QWidget):
 
             # Set colors based on assessed flag
             assessed = self.project_model.project_data["images"].get(point_name, {}).get("assessed", False)
+            preprocessed = self.project_model.project_data["images"].get(point_name, {}).get("preprocessed_flag", False)
 
-            if assessed:
+            if preprocessed:
+                pen = QPen(Qt.GlobalColor.blue)
+                brush = QBrush(QColor(0, 0, 255, 127))  # Semi-transparent blue
+            elif assessed:
                 pen = QPen(Qt.GlobalColor.green)
                 brush = QBrush(QColor(0, 255, 0, 127))  # Semi-transparent green
             else:

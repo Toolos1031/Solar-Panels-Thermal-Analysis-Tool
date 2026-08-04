@@ -4,6 +4,7 @@ from views.start_view import StartView
 from views.map_view import MapView
 from views.photo_view import PhotoView
 from models.project_model import ProjectModel
+from ui_theme import DARK_THEME
 
 
 class MainWindow(QMainWindow):
@@ -13,9 +14,20 @@ class MainWindow(QMainWindow):
         # Initialize the project model
         self.project_model = ProjectModel()
 
-        self.setWindowTitle("Thermal Application")
-        self.resize(800, 600)
+        self.setWindowTitle("Thermal Annotator")
+
+        screen_geometry = QApplication.primaryScreen().geometry()
+        window_width = int(screen_geometry.width() * 0.8)
+        window_height = int(screen_geometry.height() * 0.8)
+
+        self.resize(window_width, window_height)
+
+        x_position = (screen_geometry.width() - window_width) // 2
+        y_position = (screen_geometry.height() - window_height) // 2
+        self.move(x_position, y_position)
+
         self.setStatusBar(QStatusBar(self))
+        self.setStyleSheet(DARK_THEME)
 
         self.stacked_widget = QStackedWidget()
         self.setCentralWidget(self.stacked_widget)

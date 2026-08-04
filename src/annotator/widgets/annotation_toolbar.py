@@ -10,6 +10,7 @@ class AnnotationToolbar(QToolBar):
     clear_temp_triggered = pyqtSignal()
     label_toggled = pyqtSignal(bool)
     delete_requested = pyqtSignal()
+    hide_flagged_toggled = pyqtSignal(bool)
 
     def __init__(self):
         super().__init__()
@@ -45,6 +46,11 @@ class AnnotationToolbar(QToolBar):
         self.delete_action.triggered.connect(self.delete_requested.emit)
         self.addAction(self.delete_action)
 
+        self.hide_flagged_action = QAction("Hide Flagged Detections", self)
+        self.hide_flagged_action.setCheckable(True)
+        self.hide_flagged_action.triggered.connect(self._on_hide_flagged_toggled)
+        self.addAction(self.hide_flagged_action)
+
         # set the tool button style to display the icon and text beside each other
         self.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
 
@@ -58,6 +64,11 @@ class AnnotationToolbar(QToolBar):
         self.spot_temp_action.setChecked(False)
         self.box_temp_action.setChecked(False)
         self.label_action.setChecked(False)
+        self.hide_flagged_action.setChecked(False)
 
     def _on_clear_temp(self): # Emit a signal to clear the spot temperature markers
         self.clear_temp_triggered.emit()
+
+    def _on_hide_flagged_toggled(self, checked: bool):
+        # Emit a signal or handle the hide flagged toggled action
+        self.hide_flagged_toggled.emit(checked)

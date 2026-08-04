@@ -48,7 +48,8 @@ class DJIThermalConverterView(QMainWindow):
         settings_layout = QGridLayout()
         settings_group.setLayout(settings_layout)
 
-        self.irp_path_edit = QLineEdit(os.path.abspath('dji_thermal_sdk/utility/bin/windows/release_x64/dji_irp.exe'))
+        #self.irp_path_edit = QLineEdit(os.path.abspath('dji_thermal_sdk/utility/bin/windows/release_x64/dji_irp.exe'))
+        self.irp_path_edit = QLineEdit(r"C:\DJI_Thermal_SDK\utility\bin\windows\release_x64\dji_irp.exe")
         self.exiftool_path_edit = QLineEdit('exiftool')
         self.btn_irp = QPushButton("Browse")
         self.btn_exif = QPushButton("Browse")

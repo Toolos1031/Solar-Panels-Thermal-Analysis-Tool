@@ -11,6 +11,7 @@ class PhotoView(QWidget):
     clicked_back = pyqtSignal()
     photo_clicked = pyqtSignal(str)
     clear_temp_triggered = pyqtSignal()
+    hide_flagged_toggled = pyqtSignal(bool)
 
     def __init__(self, project_model):
         super().__init__()
@@ -20,6 +21,10 @@ class PhotoView(QWidget):
         self.current_thermal_data = None
         self.current_photo_id = None
         self.temporary_measurements = []
+        self.flagged_panels = []
+
+        self.clahe_enabled = False
+        self.thermal_pixmap_item = None
 
         self.setWindowTitle("Photo View")
 
@@ -82,6 +87,14 @@ class PhotoView(QWidget):
 
         # Connect delete action
         self.toolbar.delete_requested.connect(self._delete_selected_items)
+
+        # Connect hide flagged toggled action
+        self.toolbar.hide_flagged_toggled.connect(self._toggle_flagged_panels)
+
+        # Bind H to toggle hide/show flagged detections
+        self.hide_flagged_shortcut = QShortcut(QKeySequence(Qt.Key.Key_H), self)
+        self.hide_flagged_shortcut.activated.connect(self.toolbar.hide_flagged_action.trigger)
+
         # Bind DEL to the same function
         self.del_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Delete), self)
         self.del_shortcut.activated.connect(self._delete_selected_items)
@@ -137,6 +150,30 @@ class PhotoView(QWidget):
         self.rgb_view.zoom_triggered.connect(self.thermal_view.apply_external_zoom)
         self.thermal_view.zoom_triggered.connect(self.rgb_view.apply_external_zoom)
 
+    def resizeEvent(self, event):
+        """Automatically scales both photos to fit the window when resized."""
+        super().resizeEvent(event)
+
+        # Scale the thermal view if it has content
+        if self.thermal_scene.sceneRect().isValid() and not self.thermal_scene.sceneRect().isEmpty():
+            self.thermal_view.fitInView(self.thermal_scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
+            
+        # Scale the RGB view if it has content
+        if self.rgb_scene.sceneRect().isValid() and not self.rgb_scene.sceneRect().isEmpty():
+            self.rgb_view.fitInView(self.rgb_scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
+
+    def showEvent(self, event):
+        """Ensures the photos are scaled correctly the moment this view becomes visible."""
+        super().showEvent(event)
+
+        # Fit thermal view
+        if self.thermal_scene.sceneRect().isValid() and not self.thermal_scene.sceneRect().isEmpty():
+            self.thermal_view.fitInView(self.thermal_scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
+            
+        # Fit RGB view
+        if self.rgb_scene.sceneRect().isValid() and not self.rgb_scene.sceneRect().isEmpty():
+            self.rgb_view.fitInView(self.rgb_scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
+
     def load_photo(self, photo_id: str): # Load the selected photo and its thermal data. Controlled by main.py
         self.current_photo_id = photo_id
 
@@ -144,10 +181,12 @@ class PhotoView(QWidget):
         thermal_path = self.project_model.project_data.get("images", {}).get(photo_id, {}).get("thermal_path")
         self.current_thermal_data = self.project_model.load_raw_thermal_data(thermal_path)
 
-        # Insert thermal data into pixmap and display it in the QLabel
-        pixmap = self.project_model.create_thermal_pixmap(self.current_thermal_data)
+        # Pass the current CLAHE state and all YOLO detections to the pixmap generator
+        all_detections = self.project_model.get_all_detections(photo_id)
+        pixmap = self.project_model.create_thermal_pixmap(self.current_thermal_data, apply_clahe=self.clahe_enabled, detections=all_detections)
+
         self.thermal_scene.clear()
-        self.thermal_scene.addPixmap(pixmap)
+        self.thermal_pixmap_item = self.thermal_scene.addPixmap(pixmap)
 
         # Lock the canvas size
         self.thermal_scene.setSceneRect(0, 0, pixmap.width(), pixmap.height())
@@ -158,6 +197,7 @@ class PhotoView(QWidget):
 
         # Render saved labels onto the thermal view
         self._load_existing_annotations(photo_id)
+        self._load_flagged_detections(photo_id)
 
         self.load_rgb_photo(pixmap, photo_id)  # Load the corresponding RGB photo
 
@@ -351,5 +391,47 @@ class PhotoView(QWidget):
             text.setPos(ann["x"], ann["y"] - 25)
             self.thermal_scene.addItem(text)
 
+    def _load_flagged_detections(self, photo_id: str):
+        self.flagged_panels.clear()  # Clear any existing flagged panels
+
+        if self.project_model.project_data.get("images", {}).get(photo_id, {}).get("preprocessed_flag", False):
+            detections = self.project_model.get_flagged_detections(photo_id)
+
+            for det in detections:
+                rect = QGraphicsRectItem(det["x"], det["y"], det["w"], det["h"])
+                rect.setPen(QPen(QColor(0, 0, 255, 150), 2, Qt.PenStyle.DashLine))
+                rect.setBrush(QBrush(QColor(0, 0, 255, 30)))
+                self.thermal_scene.addItem(rect)
+
+                text = QGraphicsTextItem(str(det["panel_delta"]))
+                text.setDefaultTextColor(QColor(0, 0, 255, 150))
+                text.setPos(det["x"], det["y"] - 25)
+                self.thermal_scene.addItem(text)
+
+                # Store the flagged panel for toggle
+                self.flagged_panels.append((rect, text))
+
+    def _toggle_flagged_panels(self, show: bool):
+        for rect, text in self.flagged_panels:
+            rect.setVisible(show)
+            text.setVisible(show)
+
     def toggle_CLAHE(self):
-        ...
+        # toggles clahe on off and reloads the thermal pixmap
+        if self.current_thermal_data is None or not self.current_photo_id:
+            return  # No photo loaded, nothing to toggle
+
+        # flip the state
+        self.clahe_enabled = not self.clahe_enabled
+
+        # Fetch boxes and regenerate the image based on new state
+        all_detections = self.project_model.get_all_detections(self.current_photo_id)
+        new_pixmap = self.project_model.create_thermal_pixmap(
+            self.current_thermal_data, 
+            apply_clahe=self.clahe_enabled, 
+            detections=all_detections
+        )
+
+        # Swap the image
+        if self.thermal_pixmap_item is not None:
+            self.thermal_pixmap_item.setPixmap(new_pixmap)

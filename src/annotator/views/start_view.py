@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import(
     QFormLayout, QMessageBox, QHBoxLayout
 )
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QPixmap
 
 class StartView(QWidget):
 
@@ -14,15 +15,29 @@ class StartView(QWidget):
     def __init__(self, project_model):
         super().__init__()
         self.project_model = project_model
+
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+
         self._init_ui()
 
     def _init_ui(self):
         main_layout = QVBoxLayout(self)
         main_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
+        logo_label = QLabel()
+        logo_pixmap = QPixmap("assets/bzb_logo_tran.png")
+
+        if not logo_pixmap.isNull():
+            scaled_logo = logo_pixmap.scaledToWidth(400, Qt.TransformationMode.SmoothTransformation)
+            logo_label.setPixmap(scaled_logo)
+
+        logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        main_layout.addWidget(logo_label)
+
         # Container Card (Centers UI content on screen)
         card = QGroupBox("Start New Project")
         card.setFixedWidth(700)
+        card.setObjectName("startCard")
         card_layout = QVBoxLayout(card)
         card_layout.setSpacing(20)
 
@@ -32,28 +47,28 @@ class StartView(QWidget):
 
         # Image directory picker
         self.img_dir_input = QLineEdit()
-        self.img_dir_input.setText(r"D:\orlen_fotowoltaika\Wloclawek\1\Thermal_TIFFs")
+        self.img_dir_input.setText(os.abspath("/thermal_tiff_images"))
         self.img_dir_btn = QPushButton("Browse...")
         self.img_dir_btn.clicked.connect(self._select_img_dir)
         form_layout.addRow("Thermal Image Directory:", self._create_input_row(self.img_dir_input, self.img_dir_btn))
 
         # RGB Image directory picker
         self.rgb_dir_input = QLineEdit()
-        self.rgb_dir_input.setText(r"D:\orlen_fotowoltaika\Wloclawek\1\DJI_202408291301_002_UAV-Create-Area-Route1")
+        self.rgb_dir_input.setText(os.path.abspath("/rgb_images"))
         self.rgb_dir_btn = QPushButton("Browse...")
         self.rgb_dir_btn.clicked.connect(self._select_rgb_dir)
         form_layout.addRow("RGB Image Directory:", self._create_input_row(self.rgb_dir_input, self.rgb_dir_btn))
 
         # Ortophoto file picker
         self.ortho_input = QLineEdit()
-        self.ortho_input.setText(r"D:\orlen_fotowoltaika\test_orto.jpg")
+        self.ortho_input.setText(os.path.abspath("/orthophoto.jpg"))
         self.ortho_btn = QPushButton("Browse...")
         self.ortho_btn.clicked.connect(self._select_ortho_file)
         form_layout.addRow("Orthophoto File:", self._create_input_row(self.ortho_input, self.ortho_btn))
 
         # Project data file picker
         self.project_data_input = QLineEdit()
-        self.project_data_input.setText(r"D:\orlen_fotowoltaika\project_data.json")
+        self.project_data_input.setText(os.path.abspath("/project_data.json"))
         self.project_data_btn = QPushButton("Browse...")
         self.project_data_btn.clicked.connect(self._select_project_data_file)
         form_layout.addRow("Project Data File:", self._create_input_row(self.project_data_input, self.project_data_btn))
@@ -63,7 +78,7 @@ class StartView(QWidget):
         btn_layout.setSpacing(15)
 
         self.btn_load = QPushButton("Load Project")
-        self.btn_load.setStyleSheet("font-weight: bold; padding: 10px; background-color: #2b5b84; color: white;")
+        #self.btn_load.setStyleSheet("font-weight: bold; padding: 10px; background-color: #2b5b84; color: white;")
         self.btn_load.clicked.connect(self._load_project)
 
         btn_layout.addStretch()

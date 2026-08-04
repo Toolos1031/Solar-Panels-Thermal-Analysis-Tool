@@ -151,8 +151,8 @@ class ProjectModel(QObject):
 
         return raw_thermal_data
 
-    def create_thermal_pixmap(self, raw_thermal_data: np.ndarray) -> QPixmap: # Create a QPixmap from the raw thermal data by normalizing it to 0-255 and converting it to a grayscale image
-
+    def create_thermal_pixmap(self, raw_thermal_data: np.ndarray, apply_clahe: bool = False, detections: list = None) -> QPixmap: # Create a QPixmap from the raw thermal data by normalizing it to 0-255 and converting it to a grayscale image
+        # Creates a pixmap, optionally applies CLAHE, and overlays detections if provided
         min_temp = np.min(raw_thermal_data)
         max_temp = np.max(raw_thermal_data)
 
@@ -160,6 +160,29 @@ class ProjectModel(QObject):
             normalized = np.zeros(raw_thermal_data.shape, dtype=np.uint8)
         else:
             normalized = (255 * (raw_thermal_data - min_temp) / (max_temp - min_temp)).astype(np.uint8)
+
+        if apply_clahe and detections:
+            # Create clahe object
+            clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+            clahe_img = clahe.apply(normalized)
+
+            # Create blank boolean mask
+            mask = np.zeros_like(normalized, dtype=bool)
+            height, width = normalized.shape
+
+            # paint true onto the mask wherever a YOLO bbox exists
+            for det in detections:
+                x, y, w, h = int(det["x"]), int(det["y"]), int(det["w"]), int(det["h"])
+
+                # Constrain to image boundaries just in case
+                y1, y2 = max(0, y), min(height, y + h)
+                x1, x2 = max(0, x), min(width, x + w)
+
+                mask[y1:y2, x1:x2] = True
+
+            #Blend two images, clahe inside mask, normal outside
+            normalized = np.where(mask, clahe_img, normalized)
+
 
         height, width = normalized.shape
         bytes_per_line = width
@@ -364,3 +387,19 @@ class ProjectModel(QObject):
                 })
 
         return projected_labels
+
+    def get_all_detections(self, photo_id: str) -> list:
+        # Retrives the list of segmentations for a specific photo
+        return self.project_data.get("segmentation", {}).get(photo_id, [])
+
+    def get_flagged_detections(self, photo_id: str) -> list:
+        # Retrives the list of segmentations for a specific photo
+        detections = self.get_all_detections(photo_id)
+
+        flagged_detections = []
+
+        for det in detections:
+            if det["temp_exceeded"] == True:
+                flagged_detections.append(det)
+
+        return flagged_detections

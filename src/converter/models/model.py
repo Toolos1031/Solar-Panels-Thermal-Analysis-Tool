@@ -1,6 +1,7 @@
 import os
 import subprocess
 import logging
+import cv2
 from matplotlib.pyplot import box
 import numpy as np
 import tifffile
@@ -60,7 +61,6 @@ class ConversionWorker(QThread):
 
     def process_single_image(self, filename):
         filepath = os.path.join(self.input_dir, filename).replace('\\', '/')
-        print(filepath)
         out_filepath = os.path.join(self.output_dir, filename.replace('.JPG', '.tif')).replace('.jpg', '.tif').replace('\\', '/')
         temp_raw = os.path.join(self.output_dir, f"{filename}_temp.raw").replace('\\', '/')
 
@@ -224,7 +224,7 @@ class SegmentationWorker(QThread):
                 project_data["segmentation"] = {}
 
             # All files that end with JPG and have _V in their name (case insensitive)
-            filenames = [f for f in os.listdir(self.input_dir) if f.upper().endswith('.JPG') and '_V' in f.upper()]
+            filenames = [f for f in os.listdir(self.input_dir) if f.upper().endswith('.JPG') and '_T' in f.upper()]
             total_files = len(filenames)
 
             if total_files == 0:
@@ -241,6 +241,19 @@ class SegmentationWorker(QThread):
 
                 project_data["segmentation"][tif_filename] = []
 
+                max_image_delta_t = 0.0
+                delta_threshold = 10.0
+
+                image_info = project_data.get("images", {}).get(tif_filename, {})
+                thermal_data = None
+
+                if image_info and image_info.get("thermal_path"):
+                    tif_path = image_info["thermal_path"]
+                    if os.path.isfile(tif_path):
+                        thermal_data = tifffile.imread(tif_path)
+                    else:
+                        logging.warning(f"Thermal image {tif_path} not found for {filename}.")
+
                 results = model.predict(source = filepath, conf = 0.5, verbose = False, save = False)
 
                 for result in results:
@@ -255,16 +268,42 @@ class SegmentationWorker(QThread):
 
                             poly_points = polygon.tolist()
 
+                            min_t, max_t, panel_delta_t = 0.0, 0.0, 0.0
+
+                            if thermal_data is not None:
+                                #Create a blank mask matching the tiff dimensions
+                                mask = np.zeros(thermal_data.shape, dtype = np.uint8)
+
+                                # convert float coords to integers for cv2.fillPoly
+                                poly_int = np.array(poly_points, dtype=np.int32)
+                                cv2.fillPoly(mask, [poly_int], 1)
+
+                                panel_temps = thermal_data[mask == 1]
+
+                                if panel_temps.size > 0:
+                                    min_t = float(np.min(panel_temps))
+                                    max_t = float(np.max(panel_temps))
+                                    panel_delta_t = max_t - min_t
+
+                                    if panel_delta_t > max_image_delta_t:
+                                        max_image_delta_t = panel_delta_t
+
                             segmentation_item = {
                                 "detection_class": class_name,
+                                "temp_exceeded": bool(panel_delta_t > delta_threshold),
+                                "panel_delta": round(panel_delta_t, 2),
                                 "points": poly_points,
                                 "x": x1,
                                 "y": y1,
                                 "w": w,
                                 "h": h
                             }
-
                             project_data["segmentation"][tif_filename].append(segmentation_item)
+
+
+                if image_info:
+                    project_data["images"][tif_filename]["preprocessed_max_delta_t"] = round(max_image_delta_t, 2)
+                    project_data["images"][tif_filename]["preprocessed_flag"] = bool(max_image_delta_t > delta_threshold)
 
                 self.progress.emit(int(((i + 1) / total_files) * 100))
 

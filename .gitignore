@@ -1,2 +1,10 @@
 __pychache__/
 tester.py
+src/annotator/__pycache__/ui_theme.cpython-39.pyc
+src/annotator/views/__pycache__/map_view.cpython-39.pyc
+src/annotator/views/__pycache__/photo_view.cpython-39.pyc
+src/annotator/views/__pycache__/start_view.cpython-39.pyc
+src/annotator/widgets/__pycache__/annotation_toolbar.cpython-39.pyc
+src/converter/controllers/__pycache__/controller.cpython-39.pyc
+src/converter/models/__pycache__/model.cpython-39.pyc
+src/converter/views/__pycache__/view.cpython-39.pyc
