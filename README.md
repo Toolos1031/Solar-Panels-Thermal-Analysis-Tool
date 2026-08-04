@@ -1,4 +1,3 @@
-```markdown
 # Thermal PV Inspection Suite
 
 A complete, end-to-end processing and inspection pipeline for DJI thermal drone imagery of solar photovoltaic (PV) farms. 
@@ -35,7 +34,7 @@ Ensure you have Python 3.9+ installed. Install the required packages:
 ```bash
 pip install PyQt6 opencv-python numpy tifffile pandas ultralytics
 
-```
+
 
 ### 2. External Tools Required
 
